@@ -101,6 +101,8 @@ extern _Bool resendDate;
 #define cSegDecode7 0b00000111
 #define cSegDecode8 0b01111111
 #define cSegDecode9 0b01101111
+#define cSegDecodeA 0b01110111
+#define cSegDecodeP 0b01110011
 
 #define bSegDecode0 0b0011111100
 #define bSegDecode1 0b0000011000
@@ -162,6 +164,7 @@ enum {
   MODE_DDMMYYYY,
 #endif
 
+  MODE_12H,
   NUM_DISPLAY_MODES
 };
 
@@ -243,6 +246,7 @@ void monitor_vbus(void);
 
 #define latchSegments() \
   buffer_c[0].low = next7seg.c; \
+  if (displayMode == MODE_12H) buffer_c[3].low = next7seg.ampm; \
   buffer_b[0] = next7seg.b[0]; \
   buffer_b[1] = next7seg.b[1]; \
   buffer_b[2] = next7seg.b[2]; \
