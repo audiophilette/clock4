@@ -141,6 +141,7 @@ int32_t currentOffset=0;
 
 struct {
   uint8_t c;
+  uint8_t ampm;
   uint16_t b[5];
 } next7seg;
 
@@ -510,8 +511,15 @@ void setNextTimestamp(time_t nextTime){
 
   next7seg.c = cLut[nextBcd.seconds];
 
-  next7seg.b[0] = bCat0 | cLut[nextBcd.tenHours]<<2;
-  next7seg.b[1] = bCat1 | cLut[nextBcd.hours]<<2;
+  // Keep nextBcd in 24-hour form for date/RTC handling.
+  uint8_t hour = nextBcd.tenHours * 10 + nextBcd.hours;
+  next7seg.ampm = hour < 12 ? cSegDecodeA : cSegDecodeP;
+  if (displayMode == MODE_12H) {
+    hour %= 12;
+    if (!hour) hour = 12;
+  }
+  next7seg.b[0] = bCat0 | cLut[hour / 10]<<2;
+  next7seg.b[1] = bCat1 | cLut[hour % 10]<<2;
   next7seg.b[2] = bCat2 | cLut[nextBcd.tenMinutes]<<2;
   next7seg.b[3] = bCat3 | cLut[nextBcd.minutes]<<2;
   next7seg.b[4] = bCat4 | cLut[nextBcd.tenSeconds]<<2;
@@ -954,6 +962,8 @@ void parseConfigString(char *key, char *value) {
     }
   } else if (strcasecmp(key, "MODE_ISO8601_STD") == 0) {
     set_mode_enabled(MODE_ISO8601_STD, value);
+  } else if (strcasecmp(key, "MODE_12H") == 0) {
+    set_mode_enabled(MODE_12H, value);
   } else if (strcasecmp(key, "MODE_ISO_ORDINAL") == 0) {
     set_mode_enabled(MODE_ISO_ORDINAL, value);
   } else if (strcasecmp(key, "MODE_ISO_WEEK") == 0) {
@@ -1352,7 +1362,7 @@ void SysTick_CountUp_P3(void)
 {
   timetick()
 
-  buffer_c[3].low=cLut[millisec];
+  if (displayMode != MODE_12H) buffer_c[3].low=cLut[millisec];
   buffer_c[2].low=cLut[centisec];
   buffer_c[1].low=cLut[decisec];
 
@@ -1662,16 +1672,16 @@ void setPrecision(void){
       buffer_c[0].high= 0b11001110 | cSegDP;
       SetSysTick( &SysTick_CountUp_P3 );
     } else if (currentTime - last_pps_time < config.tolerance_10ms){
-      buffer_c[3].low = 0b01000000;
+      if (displayMode != MODE_12H) buffer_c[3].low = 0b01000000;
       buffer_c[0].high= 0b11001110 | cSegDP;
       SetSysTick( &SysTick_CountUp_P2 );
     } else if (currentTime - rtc_last_calibration < config.tolerance_100ms){
-      buffer_c[3].low = 0b01000000;
+      if (displayMode != MODE_12H) buffer_c[3].low = 0b01000000;
       buffer_c[2].low = 0b01000000;
       buffer_c[0].high= 0b11001110 | cSegDP;
       SetSysTick( &SysTick_CountUp_P1 );
     } else {
-      buffer_c[3].low = 0b01000000;
+      if (displayMode != MODE_12H) buffer_c[3].low = 0b01000000;
       buffer_c[2].low = 0b01000000;
       buffer_c[1].low = 0b01000000;
       buffer_c[0].high= 0b11001110;
@@ -1789,6 +1799,14 @@ void nextMode(_Bool reverse){
       TIM2->CCR1 = 0;
       TIM2->CCR2 = 0;
       latchSegments();
+    }
+  }
+  if (displayMode == MODE_12H || (justExited(MODE_12H) && countMode == COUNT_NORMAL)) {
+    setNextTimestamp(currentTime);
+    latchSegments();
+    if (countMode == COUNT_NORMAL) {
+      buffer_c[3].low = displayMode == MODE_12H ? next7seg.ampm : cLut[millisec];
+      setPrecision();
     }
   }
   sendDate(1);

@@ -19,6 +19,10 @@ MATRIX_FREQUENCY = 20000
 # ISO8601 standard, YYYY-MM-DD
 MODE_ISO8601_STD=Enabled
 
+# 12-hour local time: hh:mm:ss.xxA or hh:mm:ss.xxP, with ISO date.
+# Enable to select this mode; the buttons cycle through enabled modes.
+MODE_12H=disabled
+
 # ISO8601 ordinal (day of year)
 MODE_ISO_Ordinal=disabled
 
